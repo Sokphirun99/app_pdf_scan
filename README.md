@@ -37,8 +37,8 @@ A beautiful, modern mobile application for professional PDF management and editi
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/pdf-tools-pro.git
-   cd pdf-tools-pro
+   git clone https://github.com/phirun/app_pdf_scan.git
+   cd app_pdf_scan
    ```
 
 2. **Install dependencies**
@@ -119,12 +119,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📞 Support
-
-For support and questions:
-- Create an issue on GitHub
-- Email: support@pdftoolspro.com
-
 ## 🙏 Acknowledgments
 
 - Inspired by iLovePDF's excellent PDF tools
@@ -134,7 +128,13 @@ For support and questions:
 
 ---
 
-**Made with ❤️ using Flutter**
+### Made with ❤️ by Phirun using Flutter
+
+## Author
+
+👨‍💻 **Phirun**
+
+- GitHub: (https://github.com/Sokphirun99)
 
 ## Getting Started
 
