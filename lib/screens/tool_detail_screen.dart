@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/pdf_tool.dart';
+import 'scan_to_pdf_screen.dart';
 
 class ToolDetailScreen extends StatelessWidget {
   final PDFTool tool;
@@ -83,13 +84,17 @@ class ToolDetailScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.cloud_upload_outlined,
+                            tool.title == 'Scan to PDF' 
+                              ? Icons.document_scanner 
+                              : Icons.cloud_upload_outlined,
                             size: 64,
                             color: Colors.grey[400],
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Select PDF files',
+                            tool.title == 'Scan to PDF' 
+                              ? 'Scan documents with camera' 
+                              : 'Select PDF files',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -98,7 +103,9 @@ class ToolDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'or drop them here',
+                            tool.title == 'Scan to PDF' 
+                              ? 'Capture multiple pages' 
+                              : 'or drop them here',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[500],
@@ -109,8 +116,12 @@ class ToolDetailScreen extends StatelessWidget {
                             onPressed: () {
                               _selectFiles(context);
                             },
-                            icon: const Icon(Icons.folder_open),
-                            label: const Text('Select Files'),
+                            icon: Icon(tool.title == 'Scan to PDF' 
+                              ? Icons.camera_alt 
+                              : Icons.folder_open),
+                            label: Text(tool.title == 'Scan to PDF' 
+                              ? 'Start Scanning' 
+                              : 'Select Files'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: tool.color,
                               foregroundColor: Colors.white,
@@ -194,7 +205,18 @@ class ToolDetailScreen extends StatelessWidget {
   }
 
   void _selectFiles(BuildContext context) {
-    // Here you would implement file picker functionality
+    // Special handling for Scan to PDF
+    if (tool.title == 'Scan to PDF') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ScanToPdfScreen(),
+        ),
+      );
+      return;
+    }
+
+    // Here you would implement file picker functionality for other tools
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('File picker for ${tool.title} would open here'),

@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Permissions for Scan to PDF functionality -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera to scan documents and convert them to PDF.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to select images for PDF conversion.</string>
 </dict>
 </plist>
