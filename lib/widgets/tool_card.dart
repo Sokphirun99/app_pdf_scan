@@ -24,7 +24,7 @@ class ToolCard extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Colors.white, tool.color.withOpacity(0.05)],
+              colors: [Colors.white, tool.color.withValues(alpha: 0.05)],
             ),
           ),
           child: Column(
@@ -62,7 +62,7 @@ class ToolCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: tool.color.withOpacity(0.1),
+                  color: tool.color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(tool.icon, color: tool.color, size: 24),
@@ -139,7 +139,7 @@ class ToolCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -160,7 +160,7 @@ class ToolCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

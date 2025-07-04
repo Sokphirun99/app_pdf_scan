@@ -35,7 +35,7 @@ class CategoryFilter extends StatelessWidget {
                 onCategorySelected(category);
               },
               backgroundColor: Colors.white,
-              selectedColor: const Color(0xFF1E40AF).withOpacity(0.1),
+              selectedColor: const Color(0xFF1E40AF).withValues(alpha: 0.1),
               checkmarkColor: const Color(0xFF1E40AF),
               labelStyle: TextStyle(
                 color:
@@ -48,7 +48,7 @@ class CategoryFilter extends StatelessWidget {
                 color:
                     isSelected
                         ? const Color(0xFF1E40AF)
-                        : Colors.grey.withOpacity(0.3),
+                        : Colors.grey.withValues(alpha: 0.3),
                 width: 1,
               ),
               shape: RoundedRectangleBorder(
