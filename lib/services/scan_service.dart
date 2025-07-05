@@ -441,10 +441,12 @@ class ScanService {
         case PdfExportOption.shareFile:
           // Basic share functionality
           final tempDir = await getTemporaryDirectory();
-          final tempFile = File('${tempDir.path}/${fileName ?? 'document.pdf'}');
+          final tempFile = File(
+            '${tempDir.path}/${fileName ?? 'document.pdf'}',
+          );
           await tempFile.writeAsBytes(pdfBytes);
           await Share.shareXFiles([XFile(tempFile.path)]);
-          
+
           return PdfExportResult(
             success: true,
             filePath: tempFile.path,
@@ -512,10 +514,12 @@ class ScanService {
 
         case PdfExportOption.shareFile:
           final tempDir = await getTemporaryDirectory();
-          final tempFile = File('${tempDir.path}/${fileName ?? 'document.pdf'}');
+          final tempFile = File(
+            '${tempDir.path}/${fileName ?? 'document.pdf'}',
+          );
           await tempFile.writeAsBytes(pdfBytes);
           await Share.shareXFiles([XFile(tempFile.path)]);
-          
+
           return PdfExportResult(
             success: true,
             filePath: tempFile.path,
@@ -578,12 +582,13 @@ class ScanService {
               return pw.Stack(
                 children: [
                   // Main image
-                  pw.Center(
-                    child: pw.Image(image, fit: pw.BoxFit.contain),
-                  ),
+                  pw.Center(child: pw.Image(image, fit: pw.BoxFit.contain)),
                   // Watermark if enabled
                   if (config.addWatermark && config.watermarkText != null)
-                    _buildWatermark(config.watermarkText!, config.watermarkPosition),
+                    _buildWatermark(
+                      config.watermarkText!,
+                      config.watermarkPosition,
+                    ),
                 ],
               );
             },
@@ -598,10 +603,13 @@ class ScanService {
   }
 
   /// Process image based on quality settings
-  Future<XFile> processImageForPdf(XFile originalImage, PdfExportConfigWithOption config) async {
+  Future<XFile> processImageForPdf(
+    XFile originalImage,
+    PdfExportConfigWithOption config,
+  ) async {
     try {
       final bytes = await originalImage.readAsBytes();
-      
+
       // Determine target dimensions based on quality
       double maxDimension;
       switch (config.quality) {
@@ -705,7 +713,7 @@ class ScanService {
       for (final imageFile in images) {
         final inputImage = InputImage.fromFilePath(imageFile.path);
         final recognizedText = await _textRecognizer.processImage(inputImage);
-        
+
         if (recognizedText.text.isNotEmpty) {
           extractedTexts.add(recognizedText.text);
         }
@@ -857,10 +865,7 @@ class ScanService {
   }
 
   /// Print PDF with enhanced options
-  Future<PrintResult> printPdf(
-    Uint8List pdfBytes, {
-    String? jobName,
-  }) async {
+  Future<PrintResult> printPdf(Uint8List pdfBytes, {String? jobName}) async {
     try {
       await Printing.layoutPdf(
         name: jobName ?? 'Scanned Document',
@@ -868,23 +873,14 @@ class ScanService {
         onLayout: (format) async => pdfBytes,
       );
 
-      return PrintResult(
-        success: true,
-        message: 'Print job sent successfully',
-      );
+      return PrintResult(success: true, message: 'Print job sent successfully');
     } catch (e) {
-      return PrintResult(
-        success: false,
-        error: 'Failed to print PDF: $e',
-      );
+      return PrintResult(success: false, error: 'Failed to print PDF: $e');
     }
   }
 
   /// Preview PDF with enhanced options
-  Future<PreviewResult> previewPdf(
-    Uint8List pdfBytes, {
-    String? title,
-  }) async {
+  Future<PreviewResult> previewPdf(Uint8List pdfBytes, {String? title}) async {
     try {
       await Printing.layoutPdf(
         name: title ?? 'Document Preview',
@@ -897,10 +893,7 @@ class ScanService {
         message: 'PDF preview opened successfully',
       );
     } catch (e) {
-      return PreviewResult(
-        success: false,
-        error: 'Failed to preview PDF: $e',
-      );
+      return PreviewResult(success: false, error: 'Failed to preview PDF: $e');
     }
   }
 
@@ -912,13 +905,15 @@ class ScanService {
       // Documents directory
       final documentsDir = await getApplicationDocumentsDirectory();
       final documentsSpace = await _getDirectorySpace(documentsDir);
-      locations.add(StorageInfo(
-        location: SaveLocation.documents,
-        path: documentsDir.path,
-        displayName: 'Documents',
-        availableSpace: documentsSpace,
-        isWritable: true,
-      ));
+      locations.add(
+        StorageInfo(
+          location: SaveLocation.documents,
+          path: documentsDir.path,
+          displayName: 'Documents',
+          availableSpace: documentsSpace,
+          isWritable: true,
+        ),
+      );
 
       // Downloads directory (Android)
       if (Platform.isAndroid) {
@@ -926,13 +921,15 @@ class ScanService {
           final downloadsDir = Directory('/storage/emulated/0/Download');
           if (await downloadsDir.exists()) {
             final downloadsSpace = await _getDirectorySpace(downloadsDir);
-            locations.add(StorageInfo(
-              location: SaveLocation.downloads,
-              path: downloadsDir.path,
-              displayName: 'Downloads',
-              availableSpace: downloadsSpace,
-              isWritable: true,
-            ));
+            locations.add(
+              StorageInfo(
+                location: SaveLocation.downloads,
+                path: downloadsDir.path,
+                displayName: 'Downloads',
+                availableSpace: downloadsSpace,
+                isWritable: true,
+              ),
+            );
           }
         } catch (e) {
           // Downloads not accessible
@@ -958,25 +955,16 @@ class ScanService {
 }
 
 /// Enums for export options
-enum PdfExportOption {
-  saveToDevice,
-  shareFile,
-  print,
-  preview,
-}
+enum PdfExportOption { saveToDevice, shareFile, print, preview }
 
-enum SaveLocation {
-  documents,
-  downloads,
-  custom,
-}
+enum SaveLocation { documents, downloads, custom }
 
 /// Enhanced PDF Quality Options
 enum PdfQuality {
-  high,    // High resolution, larger file size
-  medium,  // Balanced quality and size
-  low,     // Lower resolution, smaller file size
-  custom,  // Custom settings
+  high, // High resolution, larger file size
+  medium, // Balanced quality and size
+  low, // Lower resolution, smaller file size
+  custom, // Custom settings
 }
 
 /// PDF Page Orientation
@@ -987,13 +975,7 @@ enum PdfOrientation {
 }
 
 /// PDF Compression Level
-enum PdfCompression {
-  none,
-  low,
-  medium,
-  high,
-  maximum,
-}
+enum PdfCompression { none, low, medium, high, maximum }
 
 /// Document Enhancement Options
 enum DocumentEnhancement {
@@ -1006,22 +988,10 @@ enum DocumentEnhancement {
 }
 
 /// PDF Security Options
-enum PdfSecurity {
-  none,
-  password,
-  readOnly,
-  noPrint,
-  noEdit,
-}
+enum PdfSecurity { none, password, readOnly, noPrint, noEdit }
 
 /// Watermark Position
-enum WatermarkPosition {
-  center,
-  topLeft,
-  topRight,
-  bottomLeft,
-  bottomRight,
-}
+enum WatermarkPosition { center, topLeft, topRight, bottomLeft, bottomRight }
 
 /// PDF Export Configuration
 class PdfExportConfig {
@@ -1296,11 +1266,7 @@ class PrintResult {
   final String? message;
   final String? error;
 
-  PrintResult({
-    required this.success,
-    this.message,
-    this.error,
-  });
+  PrintResult({required this.success, this.message, this.error});
 }
 
 class PreviewResult {
@@ -1308,11 +1274,7 @@ class PreviewResult {
   final String? message;
   final String? error;
 
-  PreviewResult({
-    required this.success,
-    this.message,
-    this.error,
-  });
+  PreviewResult({required this.success, this.message, this.error});
 }
 
 class StorageInfo {
@@ -1332,8 +1294,12 @@ class StorageInfo {
 
   String get formattedSize {
     if (availableSpace < 1024) return '${availableSpace}B';
-    if (availableSpace < 1024 * 1024) return '${(availableSpace / 1024).toStringAsFixed(1)}KB';
-    if (availableSpace < 1024 * 1024 * 1024) return '${(availableSpace / (1024 * 1024)).toStringAsFixed(1)}MB';
+    if (availableSpace < 1024 * 1024) {
+      return '${(availableSpace / 1024).toStringAsFixed(1)}KB';
+    }
+    if (availableSpace < 1024 * 1024 * 1024) {
+      return '${(availableSpace / (1024 * 1024)).toStringAsFixed(1)}MB';
+    }
     return '${(availableSpace / (1024 * 1024 * 1024)).toStringAsFixed(1)}GB';
   }
 }

@@ -3,18 +3,22 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppThemes {
   // Dark Mode Color Palette
-  static const Color darkPrimary = Color(0xFF1E40AF); // Deep Blue
-  static const Color darkSecondary = Color(0xFF059669); // Emerald Green
-  static const Color darkTertiary = Color(0xFF7C3AED); // Purple accent
-  static const Color darkBackground = Color(0xFF0F0F23); // Very dark blue
-  static const Color darkSurface = Color(0xFF1A1A2E); // Dark blue-gray
-  static const Color darkCard = Color(0xFF16213E); // Dark blue card
-  static const Color darkText = Color(0xFFE8E8E8); // Light gray text
-  static const Color darkTextSecondary = Color(0xFFB0B0B0); // Medium gray text
-  static const Color darkAccent = Color(0xFF4F46E5); // Indigo accent
-  static const Color darkSuccess = Color(0xFF10B981); // Green success
-  static const Color darkWarning = Color(0xFFF59E0B); // Orange warning
-  static const Color darkError = Color(0xFFEF4444); // Red error
+  static const Color darkPrimary = Color(
+    0xFF3B82F6,
+  ); // Lighter blue that's easier on the eyes
+  static const Color darkSecondary = Color(0xFF34D399); // Softer green
+  static const Color darkTertiary = Color(0xFF8B5CF6); // Softer purple accent
+  static const Color darkBackground = Color(0xFF121212); // Neutral dark gray
+  static const Color darkSurface = Color(0xFF1E1E1E); // Slightly lighter gray
+  static const Color darkCard = Color(0xFF242424); // Card background
+  static const Color darkText = Color(0xFFF9FAFB); // Crisp white text
+  static const Color darkTextSecondary = Color(0xFFD1D5DB); // Lighter gray text
+  static const Color darkAccent = Color(0xFF6366F1); // Softer indigo accent
+  static const Color darkSuccess = Color(
+    0xFF22C55E,
+  ); // Vibrant but not harsh green
+  static const Color darkWarning = Color(0xFFFBBF24); // Softer orange warning
+  static const Color darkError = Color(0xFFF87171); // Softer red error
 
   // Light Mode Color Palette
   static const Color lightPrimary = Color(0xFF1E40AF); // Deep Blue
@@ -40,10 +44,12 @@ class AppThemes {
         secondary: darkSecondary,
         tertiary: darkTertiary,
         surface: darkSurface,
+        background: darkBackground,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onTertiary: Colors.white,
         onSurface: darkText,
+        onBackground: darkText,
         error: darkError,
         onError: Colors.white,
       ),
@@ -64,16 +70,16 @@ class AppThemes {
       ),
       cardTheme: CardThemeData(
         color: darkCard,
-        elevation: 4,
-        shadowColor: Colors.black26,
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.3),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: darkPrimary,
           foregroundColor: Colors.white,
-          elevation: 3,
-          shadowColor: darkPrimary.withValues(alpha: 0.3),
+          elevation: 2,
+          shadowColor: darkPrimary.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -85,16 +91,16 @@ class AppThemes {
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: darkAccent,
+        backgroundColor: darkPrimary,
         foregroundColor: Colors.white,
-        elevation: 6,
+        elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: darkSurface,
         selectedItemColor: darkPrimary,
         unselectedItemColor: darkTextSecondary,
-        elevation: 8,
+        elevation: 4,
         type: BottomNavigationBarType.fixed,
         selectedLabelStyle: GoogleFonts.poppins(
           fontSize: 12,

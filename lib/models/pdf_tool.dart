@@ -63,14 +63,14 @@ class PDFTool {
       //   color: const Color(0xFFDC2626), // Red
       //   category: 'Convert',
       // ),
-      // PDFTool(
-      //   id: 'pdf_to_jpg',
-      //   title: 'PDF to JPG',
-      //   description: 'Convert each PDF page into a JPG image',
-      //   icon: Icons.image,
-      //   color: const Color(0xFFDB2777), // Pink
-      //   category: 'Convert',
-      // ),
+      PDFTool(
+        id: 'pdf_to_jpg',
+        title: 'PDF to JPG',
+        description: 'Convert each PDF page into a JPG image',
+        icon: Icons.image,
+        color: const Color(0xFFDB2777), // Pink
+        category: 'Convert',
+      ),
       // PDFTool(
       //   id: 'jpg_to_pdf',
       //   title: 'JPG to PDF',

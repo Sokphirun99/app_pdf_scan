@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
+import '../services/scan_service.dart';
+import 'advanced_scanner_screen.dart';
 
 class ScanToPdfScreen extends StatefulWidget {
   const ScanToPdfScreen({super.key});
@@ -16,45 +13,221 @@ class ScanToPdfScreen extends StatefulWidget {
   State<ScanToPdfScreen> createState() => _ScanToPdfScreenState();
 }
 
-class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
-  final ImagePicker _picker = ImagePicker();
-  List<XFile> _scannedImages = [];
+class _ScanToPdfScreenState extends State<ScanToPdfScreen>
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  final List<XFile> _scannedImages = [];
+  final ScanService _scanService = ScanService();
   bool _isProcessing = false;
+  bool _cameraInUse = false;
+
+  // Keep state alive to prevent recreation after camera use
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Pre-initialize service
+    _initializeService();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Cleanup temporary files when screen is disposed
+    _scanService.cleanupTempFiles();
+    super.dispose();
+  }
+
+  /// Pre-initialize the service to ensure readiness
+  Future<void> _initializeService() async {
+    try {
+      await _scanService.requestPermissions();
+    } catch (e) {
+      // Ignore initialization errors
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App resumed - likely after camera use
+        if (_cameraInUse || _isProcessing) {
+          _handleAppResumed();
+        }
+        break;
+      case AppLifecycleState.paused:
+        // App paused - likely for camera use
+        if (_isProcessing) {
+          _cameraInUse = true;
+        }
+        break;
+      case AppLifecycleState.inactive:
+        // App inactive - transitioning
+        break;
+      case AppLifecycleState.detached:
+        // App detached
+        break;
+      case AppLifecycleState.hidden:
+        // App hidden
+        break;
+    }
+  }
+
+  /// Handle app resumed after camera operation
+  void _handleAppResumed() {
+    // Reset states with delay to ensure proper initialization
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _cameraInUse = false;
+        });
+
+        // Force a rebuild to refresh UI
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    });
+  }
 
   Future<void> _captureImage(ImageSource source) async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        imageQuality: 80,
-        maxWidth: 1920,
-        maxHeight: 1920,
-      );
+      // Prevent multiple simultaneous captures
+      if (_isProcessing || _cameraInUse) {
+        _showErrorDialog('Camera is busy. Please wait and try again.');
+        return;
+      }
 
-      if (image != null) {
-        setState(() {
-          _scannedImages.add(image);
-        });
+      // Show loading indicator
+      setState(() {
+        _isProcessing = true;
+        _cameraInUse = true;
+      });
+
+      // Add delay to ensure UI updates and proper state
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Attempt to capture image with retry logic
+      XFile? image;
+      int retryCount = 0;
+      const maxRetries = 2;
+
+      while (retryCount <= maxRetries && image == null) {
+        try {
+          image = await _scanService.captureImageSafe();
+          break; // Success, exit retry loop
+        } on ScanException {
+          retryCount++;
+          if (retryCount > maxRetries) {
+            rethrow; // Max retries reached, propagate error
+          }
+
+          // Wait before retry
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+
+      if (image != null && mounted) {
+        // Optimize image to prevent memory issues
+        try {
+          final optimizedImage = await _scanService.optimizeImageForPdf(image);
+          setState(() {
+            _scannedImages.add(optimizedImage);
+          });
+
+          // Show success feedback
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image captured and optimized successfully!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (e) {
+          // Fallback to original image if optimization fails
+          setState(() {
+            _scannedImages.add(image!); // Using ! since we checked null above
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image captured successfully!'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      } else if (mounted) {
+        // User cancelled camera
+        _showInfoDialog('Camera operation was cancelled.');
+      }
+    } on ScanException catch (e) {
+      if (mounted) {
+        _showErrorDialog(e.message);
       }
     } catch (e) {
-      _showErrorDialog('Failed to capture image: $e');
+      if (mounted) {
+        _showErrorDialog(
+          'Unexpected camera error. Please restart the app if this continues.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _cameraInUse = false;
+        });
+      }
     }
   }
 
   Future<void> _pickMultipleImages() async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage(
-        imageQuality: 80,
-        maxWidth: 1920,
-        maxHeight: 1920,
-      );
+      // Show loading indicator
+      setState(() {
+        _isProcessing = true;
+      });
+
+      final List<XFile> images = await _scanService.pickMultipleImages();
 
       if (images.isNotEmpty) {
         setState(() {
           _scannedImages.addAll(images);
         });
+
+        // Show success feedback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${images.length} image(s) selected successfully!'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } on ScanException catch (e) {
+      if (mounted) {
+        _showErrorDialog(e.message);
       }
     } catch (e) {
-      _showErrorDialog('Failed to pick images: $e');
+      if (mounted) {
+        _showErrorDialog('Unexpected error: $e');
+      }
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
     }
   }
 
@@ -74,14 +247,6 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
     });
   }
 
-  Future<Uint8List> _imageToUint8List(XFile imageFile) async {
-    final bytes = await imageFile.readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    final byteData = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
-  }
-
   Future<void> _generatePdf() async {
     if (_scannedImages.isEmpty) {
       _showErrorDialog('Please add at least one image to create a PDF');
@@ -93,52 +258,23 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
     });
 
     try {
-      final pdf = pw.Document();
+      final result = await _scanService.scanToPdf(
+        _scannedImages,
+        fileName:
+            'scanned_document_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      );
 
-      for (final imageFile in _scannedImages) {
-        final imageBytes = await _imageToUint8List(imageFile);
-        final image = pw.MemoryImage(imageBytes);
-
-        pdf.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.all(20),
-            build: (pw.Context context) {
-              return pw.Center(
-                child: pw.Image(
-                  image,
-                  fit: pw.BoxFit.contain,
-                ),
-              );
-            },
-          ),
-        );
+      if (result.success) {
+        _showSuccessDialog(result.filePath!, result.pdfBytes!);
+      } else {
+        _showErrorDialog('Failed to generate PDF: ${result.error}');
       }
-
-      final pdfBytes = await pdf.save();
-      await _savePdf(pdfBytes);
     } catch (e) {
       _showErrorDialog('Failed to generate PDF: $e');
     } finally {
       setState(() {
         _isProcessing = false;
       });
-    }
-  }
-
-  Future<void> _savePdf(Uint8List pdfBytes) async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'scanned_document_$timestamp.pdf';
-      final file = File('${directory.path}/$fileName');
-      
-      await file.writeAsBytes(pdfBytes);
-
-      // Show success dialog with options
-      _showSuccessDialog(file.path, pdfBytes);
-    } catch (e) {
-      _showErrorDialog('Failed to save PDF: $e');
     }
   }
 
@@ -149,39 +285,84 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
         return AlertDialog(
           title: const Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 8),
+              Icon(Icons.check_circle, color: Colors.green, size: 28),
+              SizedBox(width: 12),
               Text('PDF Created Successfully!'),
             ],
           ),
-          content: Text('Your PDF has been saved to:\n$filePath'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your document has been converted to PDF successfully!',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.green.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.folder, color: Colors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Saved to: ${filePath.split('/').last}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Choose what you\'d like to do next:',
+                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+              ),
+            ],
+          ),
           actions: [
+            // Close button
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: const Text('Close'),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await Printing.sharePdf(
-                  bytes: pdfBytes,
-                  filename: 'scanned_document.pdf',
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E40AF),
-              ),
-              child: const Text('Share', style: TextStyle(color: Colors.white)),
-            ),
-            ElevatedButton(
+            // Preview button
+            ElevatedButton.icon(
               onPressed: () async {
                 Navigator.of(context).pop();
                 await Printing.layoutPdf(onLayout: (format) => pdfBytes);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
               ),
-              child: const Text('Preview', style: TextStyle(color: Colors.white)),
+              icon: const Icon(Icons.visibility, size: 18),
+              label: const Text('Preview'),
+            ),
+            // Share button
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _savePdfWithOptions(pdfBytes, filePath);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E40AF),
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.save_alt, size: 18),
+              label: const Text('Save & Share'),
             ),
           ],
         );
@@ -213,44 +394,105 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
     );
   }
 
+  void _showInfoDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Information'),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return Container(
-          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Select Image Source',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              // Handle bar
+              Container(
+                width: 50,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                'Choose how to add images',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D3748),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Select your preferred method to capture documents',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+
+              // Two main options
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildSourceOption(
-                    icon: Icons.camera_alt,
-                    label: 'Camera',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _captureImage(ImageSource.camera);
-                    },
+                  // Camera Option
+                  Expanded(
+                    child: _buildSourceOption(
+                      icon: Icons.camera_alt,
+                      label: 'Take Photo',
+                      description: 'Use camera to scan document',
+                      color: const Color(0xFF1E40AF),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _captureImage(ImageSource.camera);
+                      },
+                    ),
                   ),
-                  _buildSourceOption(
-                    icon: Icons.photo_library,
-                    label: 'Gallery',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _pickMultipleImages();
-                    },
+                  const SizedBox(width: 16),
+                  // Gallery Option
+                  Expanded(
+                    child: _buildSourceOption(
+                      icon: Icons.photo_library,
+                      label: 'From Gallery',
+                      description: 'Choose existing photos',
+                      color: const Color(0xFF059669),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickMultipleImages();
+                      },
+                    ),
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
             ],
           ),
         );
@@ -262,33 +504,53 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    String? description,
+    Color? color,
   }) {
+    final buttonColor = color ?? const Color(0xFF1E40AF);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E40AF).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
+          color: buttonColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFF1E40AF).withOpacity(0.3),
+            color: buttonColor.withValues(alpha: 0.3),
+            width: 1.5,
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 40,
-              color: const Color(0xFF1E40AF),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: buttonColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 32, color: buttonColor),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF1E40AF),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: buttonColor,
               ),
             ),
+            if (description != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
         ),
       ),
@@ -297,19 +559,29 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Scan to PDF',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          '📄 Scan to PDF 🔥',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF1E40AF),
+        backgroundColor: const Color(0xFF7C3AED),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AdvancedScannerScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.document_scanner),
+            tooltip: 'Advanced Scanner',
+          ),
           if (_scannedImages.isNotEmpty)
             IconButton(
               onPressed: () {
@@ -329,41 +601,78 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E40AF).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(60),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Large icon with gradient background
+            Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF1E40AF).withValues(alpha: 0.1),
+                    const Color(0xFF059669).withValues(alpha: 0.1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(70),
+                border: Border.all(
+                  color: const Color(0xFF1E40AF).withValues(alpha: 0.2),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.document_scanner,
+                size: 64,
+                color: Color(0xFF1E40AF),
+              ),
             ),
-            child: const Icon(
-              Icons.document_scanner,
-              size: 60,
-              color: Color(0xFF1E40AF),
+            const SizedBox(height: 32),
+
+            // Main title
+            const Text(
+              'Ready to Scan!',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2D3748),
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'No Images Added',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
+            const SizedBox(height: 16),
+
+            // Description
+            Text(
+              'Tap the blue button below to get started.\nYou can take photos or choose from gallery.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                height: 1.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Tap the camera button to start scanning\ndocuments or select from gallery',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
+            const SizedBox(height: 40),
+
+            // Visual hint with arrow pointing down
+            Column(
+              children: [
+                Icon(Icons.arrow_downward, size: 32, color: Colors.grey[400]),
+                const SizedBox(height: 8),
+                Text(
+                  'Start here',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -373,13 +682,10 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
       children: [
         Container(
           padding: const EdgeInsets.all(16),
-          color: const Color(0xFF1E40AF).withOpacity(0.1),
+          color: const Color(0xFF1E40AF).withValues(alpha: 0.1),
           child: Row(
             children: [
-              const Icon(
-                Icons.info_outline,
-                color: Color(0xFF1E40AF),
-              ),
+              const Icon(Icons.info_outline, color: Color(0xFF1E40AF)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -442,30 +748,291 @@ class _ScanToPdfScreenState extends State<ScanToPdfScreen> {
             heroTag: "generate_pdf",
             onPressed: _isProcessing ? null : _generatePdf,
             backgroundColor: const Color(0xFF059669),
-            icon: _isProcessing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Icon(Icons.picture_as_pdf, color: Colors.white),
+            elevation: 8,
+            icon:
+                _isProcessing
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                    : const Icon(Icons.picture_as_pdf, color: Colors.white),
             label: Text(
               _isProcessing ? 'Generating...' : 'Generate PDF',
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
           ),
           const SizedBox(height: 16),
         ],
-        FloatingActionButton(
-          heroTag: "add_image",
-          onPressed: _showImageSourceDialog,
-          backgroundColor: const Color(0xFF1E40AF),
-          child: const Icon(Icons.add_a_photo, color: Colors.white),
+        // Main scan button - larger and more prominent
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E40AF).withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: FloatingActionButton.large(
+            heroTag: "add_image",
+            onPressed: _isProcessing ? null : _showImageSourceDialog,
+            backgroundColor:
+                _isProcessing ? Colors.grey : const Color(0xFF1E40AF),
+            elevation: 0,
+            child:
+                _isProcessing
+                    ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                    : const Icon(
+                      Icons.add_a_photo,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+          ),
         ),
       ],
     );
+  }
+
+  Future<void> _savePdfWithOptions(
+    Uint8List pdfBytes,
+    String currentFilePath,
+  ) async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 50,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title
+              const Text(
+                'Save & Share Your PDF',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D3748),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Choose how you want to save or share your document',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+
+              // Save options
+              Column(
+                children: [
+                  // Share via apps
+                  _buildSaveOption(
+                    icon: Icons.share,
+                    title: 'Share Document',
+                    description: 'Send via email, messaging, or other apps',
+                    color: const Color(0xFF1E40AF),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Printing.sharePdf(
+                        bytes: pdfBytes,
+                        filename: 'scanned_document.pdf',
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Save to device
+                  _buildSaveOption(
+                    icon: Icons.download,
+                    title: 'Save to Downloads',
+                    description: 'Save PDF to your device downloads folder',
+                    color: const Color(0xFF059669),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _saveToDownloads(pdfBytes);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Print option
+                  _buildSaveOption(
+                    icon: Icons.print,
+                    title: 'Print Document',
+                    description: 'Send to printer or save as PDF',
+                    color: const Color(0xFF7C3AED),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Printing.layoutPdf(onLayout: (format) => pdfBytes);
+                    },
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Cancel button
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSaveOption({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: color, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveToDownloads(Uint8List pdfBytes) async {
+    try {
+      // Show loading
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 16),
+                Text('Saving PDF to Downloads...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Use the scan service to save to downloads
+      final result = await _scanService.savePdfToLocation(
+        pdfBytes,
+        fileName:
+            'scanned_document_${DateTime.now().millisecondsSinceEpoch}.pdf',
+        location: SaveLocation.downloads,
+      );
+
+      if (mounted) {
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 16),
+                  Expanded(child: Text('PDF saved to ${result.saveLocation}!')),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save PDF: ${result.error}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

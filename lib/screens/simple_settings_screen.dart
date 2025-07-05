@@ -48,11 +48,6 @@ class SimpleSettingsScreen extends StatelessWidget {
             ],
           ),
         ),
-
-        // Premium Button
-        PremiumButton(onPressed: SettingsConfig.handlePremiumUpgrade),
-
-        const SizedBox(height: 32),
       ],
     );
   }

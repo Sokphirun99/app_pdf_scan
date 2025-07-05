@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/pdf_tool.dart';
-import 'scan_to_pdf_screen.dart';
+import 'simple_scan_to_pdf_screen.dart';
 
 class ToolDetailScreen extends StatelessWidget {
   final PDFTool tool;
@@ -35,7 +35,7 @@ class ToolDetailScreen extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(tool.icon, color: Colors.white, size: 40),
@@ -53,7 +53,7 @@ class ToolDetailScreen extends StatelessWidget {
                 Text(
                   tool.description,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 16,
                   ),
                   textAlign: TextAlign.center,
@@ -75,7 +75,7 @@ class ToolDetailScreen extends StatelessWidget {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: Colors.grey.withOpacity(0.3),
+                          color: Colors.grey.withValues(alpha: 0.3),
                           width: 2,
                           style: BorderStyle.solid,
                         ),
@@ -84,17 +84,17 @@ class ToolDetailScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            tool.title == 'Scan to PDF' 
-                              ? Icons.document_scanner 
-                              : Icons.cloud_upload_outlined,
+                            tool.title == 'Scan to PDF'
+                                ? Icons.document_scanner
+                                : Icons.cloud_upload_outlined,
                             size: 64,
                             color: Colors.grey[400],
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            tool.title == 'Scan to PDF' 
-                              ? 'Scan documents with camera' 
-                              : 'Select PDF files',
+                            tool.title == 'Scan to PDF'
+                                ? 'Scan documents with camera'
+                                : 'Select PDF files',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -103,9 +103,9 @@ class ToolDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            tool.title == 'Scan to PDF' 
-                              ? 'Capture multiple pages' 
-                              : 'or drop them here',
+                            tool.title == 'Scan to PDF'
+                                ? 'Capture multiple pages'
+                                : 'or drop them here',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[500],
@@ -116,12 +116,16 @@ class ToolDetailScreen extends StatelessWidget {
                             onPressed: () {
                               _selectFiles(context);
                             },
-                            icon: Icon(tool.title == 'Scan to PDF' 
-                              ? Icons.camera_alt 
-                              : Icons.folder_open),
-                            label: Text(tool.title == 'Scan to PDF' 
-                              ? 'Start Scanning' 
-                              : 'Select Files'),
+                            icon: Icon(
+                              tool.title == 'Scan to PDF'
+                                  ? Icons.camera_alt
+                                  : Icons.folder_open,
+                            ),
+                            label: Text(
+                              tool.title == 'Scan to PDF'
+                                  ? 'Start Scanning'
+                                  : 'Select Files',
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: tool.color,
                               foregroundColor: Colors.white,
@@ -150,7 +154,7 @@ class ToolDetailScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
+                          color: Colors.grey.withValues(alpha: 0.1),
                           spreadRadius: 1,
                           blurRadius: 6,
                           offset: const Offset(0, 2),
@@ -209,9 +213,7 @@ class ToolDetailScreen extends StatelessWidget {
     if (tool.title == 'Scan to PDF') {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const ScanToPdfScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const SimpleScanToPdfScreen()),
       );
       return;
     }

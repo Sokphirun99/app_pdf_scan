@@ -9,7 +9,6 @@ class SettingsConfig {
   static List<SettingsSection> getAllSections() {
     return [
       _getAppearanceSection(),
-      _getAccountSection(),
       _getPreferencesSection(),
       _getSupportSection(),
     ];
@@ -27,39 +26,6 @@ class SettingsConfig {
           onTap: () {
             // Theme selection logic will go here
             debugPrint('Theme settings tapped');
-          },
-        ),
-      ],
-    );
-  }
-
-  /// Account Settings Section
-  static SettingsSection _getAccountSection() {
-    return SettingsSection(
-      title: 'Account',
-      items: [
-        SettingsItem(
-          icon: Icons.account_circle,
-          title: 'Account',
-          subtitle: 'Manage your account settings',
-          onTap: () {
-            debugPrint('Account settings tapped');
-          },
-        ),
-        SettingsItem(
-          icon: Icons.cloud_upload,
-          title: 'Cloud Storage',
-          subtitle: 'Connect to your cloud storage',
-          onTap: () {
-            debugPrint('Cloud storage tapped');
-          },
-        ),
-        SettingsItem(
-          icon: Icons.security,
-          title: 'Privacy & Security',
-          subtitle: 'Manage your privacy settings',
-          onTap: () {
-            debugPrint('Privacy settings tapped');
           },
         ),
       ],

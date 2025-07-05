@@ -278,7 +278,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) for deta
 
 ## 👨‍💻 Author
 
-**Phirun**
+### Phirun
 
 - GitHub: [@Sokphirun99](https://github.com/Sokphirun99)
 - Email: [Your Email]
